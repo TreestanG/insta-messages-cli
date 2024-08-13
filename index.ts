@@ -3,6 +3,7 @@ import path from 'path'
 import chalk from 'chalk'
 import { Message, Messages } from './types';
 
+
 let searchTerm: string = '' // search for a specific person
 let firstXMessages = undefined // cut off the first x messages
 let person = '' // highlight messages from person
@@ -36,15 +37,19 @@ args.forEach((arg, index) => {
             break
         case '-help':
             console.log(`
--to: search for a specific person (*required)
--first: cut off the first x messages (default: all)
--from: highlight messages from person (default: all members)
+Instagram Messages CLI
+
+Usage: node index.ts -flag option
+
+-to <person>: search for a specific person (*required)
+-first <number>: cut off the first x messages (default: all)
+-from <person>: highlight messages from person (default: all members)
 -h: toggle highlight (default: false)
 -save: save to file (default: false)
--index: search between multiple files (default: 0)
--before: search before a specific date (default: none)
--after: search after a specific date (default: none)
--contains: search for a specific word in messages (default: none)
+-index <number>: search between multiple files (default: 0)
+-before <date>: search before a specific date (default: none)
+-after <date>: search after a specific date (default: none)
+-contains <"words">: search for a specific word in messages (default: none)
             `)
             process.exit(0)
         case '-before':
@@ -59,8 +64,14 @@ args.forEach((arg, index) => {
     }
 })
 
+let foundInboxDirs = readdirSync('./').filter(file => file.includes('inbox') || (file.includes("-001") && file.includes('inbox')))
 
-const inbox = readdirSync('./inbox-20240812T070227Z-001/inbox')
+if (foundInboxDirs.length === 0) {
+    console.log('No inbox directories found. Inbox directories should include "inbox"')
+    process.exit(0)
+}
+
+const inbox = readdirSync(path.join(__dirname, foundInboxDirs[0], 'inbox'))
 const findJson = (name: string) => {
     const files = inbox.filter(file => file.includes(name))
     return files
@@ -90,7 +101,9 @@ const createMessageJson = (name: string) : [Messages, string[]] => {
 }
 
 let [messageJson, files] = createMessageJson(searchTerm)
-let messages: Message[] = messageJson.messages.filter(message => message.content).filter(message => {
+let messages: Message[] = messageJson.messages
+
+messages = messages.filter(message => message.content).filter(message => {
 
     const beforeCheck = beforeDate ? (new Date(message.timestamp_ms) < beforeDate) : true
     const afterCheck = afterDate ? (new Date(message.timestamp_ms) > afterDate) : true
@@ -98,6 +111,12 @@ let messages: Message[] = messageJson.messages.filter(message => message.content
     const containCheck = contains.length > 0 ? message.content.toLowerCase().includes(contains.toLowerCase()) : true
     return dateCheck && containCheck
 
+}).map(message => {
+    return {
+        ...message,
+        content: Buffer.from(message.content, 'ascii').toString('utf8'),
+        sender_name: Buffer.from(message.sender_name, 'ascii').toString('utf8')
+    }
 })
 
 if (person.length > 0 && !highlightPerson) {
